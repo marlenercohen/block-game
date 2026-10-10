@@ -17,7 +17,8 @@ export const CONFIG = {
   removeY: -12,
 
   // Ready-for-next-action criteria
-  settle: { linSpeed: 0.08, angSpeed: 0.2, seconds: 0.3, maxWaitSeconds: 5 },
+  // Ready for the next click when EITHER everything has settled (below the speeds for `seconds`) OR `maxWaitSeconds` have passed since the last impulse, whichever comes first.
+  settle: { linSpeed: 0.08, angSpeed: 0.2, seconds: 0.3, maxWaitSeconds: 0.5 },
   // Developer option: accept clicks while blocks are still moving (off by default: trials start from a still tower)
   allowClickWhileMoving: false,
 
