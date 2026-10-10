@@ -1,0 +1,11 @@
+import { initPhysics, Simulation } from '../src/physics.js';
+import { TOWERS, resolveTower } from '../src/towers.js';
+import { compressions } from '../src/softbody.js';
+await initPhysics();
+const t0=Date.now();
+TOWERS.forEach((t,ti)=>{ const sim=new Simulation(resolveTower(t,0)); const p0=sim.blocks.map(b=>({...b.body.translation()}));
+  for(let i=0;i<120*4;i++) sim.step();
+  let d=0; sim.blocks.forEach((b,i)=>{const p=b.body.translation(); d=Math.max(d,Math.hypot(p.x-p0[i].x,p.y-p0[i].y,p.z-p0[i].z));});
+  const comp = sim.blocks.filter(b=>b.soft).map(b=>'['+compressions(b.soft).map(x=>x.toFixed(3)).join(',')+']').join(' ');
+  console.log(t.name,'4s drift',d.toFixed(4),'asleep',sim.blocks.every(b=>b.bodies.every(x=>x.isSleeping())),comp); });
+console.log('ms',Date.now()-t0);
