@@ -181,7 +181,7 @@ export const TOWERS = [
 // is just the number; `name` below is for developers only.
 for (const src of [3, 7, 12]) {                       // Tower 3 (tall narrow), Tower 7 (mixed materials), Tower 12 (soft vs rigid base)
   const t = structuredClone(TOWERS[src - 1]);
-  TOWERS.push({ ...t, name: `${t.name} [inverted view of tower ${src}]`, inverted: true });
+  TOWERS.push({ ...t, name: `${t.name} [inverted view of tower ${src}]`, inverted: true, configId: src });
 }
 
 /** Apply a variant's material swaps and return a plain tower object ready for Simulation. */

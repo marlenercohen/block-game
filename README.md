@@ -26,6 +26,15 @@ the pixel comparison in the report show the equivalence.
 shows for `demoDelayMs` (1.5 s, `src/config.js`) and another random tower loads, indefinitely. Manually selecting a tower, resetting, or switching Demo Mode off
 cancels a pending transition (Demo Mode stays on unless unchecked).
 
+## Behavioural data (local only)
+The game logs sessions, trials and every click/tap in the browser (`src/logger.js`) and keeps them in memory + `sessionStorage` (survives an accidental refresh).
+Nothing is uploaded. A small, faint **Download data** button (bottom-right; **CSV** next to it for a one-row-per-trial summary) saves
+`blockgame_<sessionId>_<date-time>.json`; downloading does not reset anything. Fields: random session ID, date/time, build (git hash), observed
+browser/OS/screen/devicePixelRatio/orientation/touch capability, an *inferred* device category (phone/tablet/desktop - a heuristic), counts of the
+pointer types actually seen (mouse/touch/pen); per trial: tower number, underlying config number (inverted copies point at the tower they duplicate),
+inverted?, Demo Mode?, start/end time, duration, attempts/hits/misses/ignored presses, outcome (`completed`, `reset`, `switched_tower`, `abandoned` = page closed or reloaded, `dev_reload`; `null` = still in progress when downloaded),
+physics snapshot (impulse, hold time, gray density ratio, pink friction + soft parameters); per action: time since trial start, screen x/y, 3D hit point, block index and material, hit/miss/ignored/released-early/fired, impulse magnitude + direction, hold duration, pointer type.
+
 ## Run locally
 Requires Node.js 18+ (https://nodejs.org).
 ```

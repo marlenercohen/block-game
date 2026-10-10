@@ -4,9 +4,11 @@ import { TOWERS, PLAYGROUND, resolveTower, labelFor, versionLabel } from './towe
 import { MATERIALS, SOFT } from './materials.js';
 import { initPhysics, Simulation } from './physics.js';
 import { SceneView } from './scene.js';
+import { Logger } from './logger.js';
 
 const $ = id => document.getElementById(id);
 const view = new SceneView($('c'));
+const logger = new Logger();
 await initPhysics();
 
 const game = {
@@ -26,7 +28,16 @@ function fillTowerMenu() {
   currentSet().forEach((t, i) => sel.add(new Option(labelFor(game.set, i), i)));
 }
 
-function loadTower(i, v = 0) {
+function physicsSnapshot() {
+  return {
+    impulseMagnitude: CONFIG.impulseMagnitude, holdMs: CONFIG.holdMs, gravity: CONFIG.gravity, fixedDt: CONFIG.fixedDt, softSubsteps: CONFIG.softSubsteps,
+    grayDensityRatio: MATERIALS.gray.density / MATERIALS.blue.density, pinkFriction: MATERIALS.pink.friction, soft: { ...SOFT },
+  };
+}
+
+/** reason: how the previous (unfinished) trial ended - 'switched_tower' | 'reset' | 'dev_reload'. A completed trial is never overwritten. */
+function loadTower(i, v = 0, reason = 'switched_tower') {
+  logger.endTrial(reason);
   const tw = currentSet()[i];
   game.towerIndex = i; game.variantIndex = v;
   game.sim = new Simulation(resolveTower(tw, v));   // fresh world => exact repeatability
@@ -46,29 +57,48 @@ function loadTower(i, v = 0) {
   $('tower').value = i;
   view.buildBlocks(game.sim);
   Object.assign(game, { actions: 0, status: 'ready', restTime: 0, runTime: 0, hold: null, won: false });
+  const letter = 'ABCDEFGH'[i];
+  logger.beginTrial({
+    towerId: game.set === 'towers' ? i + 1 : `Scene ${letter}`, set: game.set, towerIndex: i,
+    configId: game.set === 'towers' ? (tw.configId ?? i + 1) : `scene-${letter}`,   // inverted copies carry the number of the tower they duplicate
+    inverted: !!tw.inverted, variant: tw.variants ? versionLabel(v) : null, demoMode: game.demo, physics: physicsSnapshot(),
+  });
   updateHud();
 }
 
 // ---- input ------------------------------------------------------------------------------------
 const canvas = $('c');
 canvas.addEventListener('pointerdown', e => {
-  if (e.button !== 0 || (game.status !== 'ready' && !CONFIG.allowClickWhileMoving) || game.paused || game.won || game.hold) return;
+  if (e.button !== 0) return;
   const hit = view.pick(e.clientX, e.clientY);
-  if (!hit) return;
-  game.hold = { blockId: hit.block.id, localPoint: hit.localPoint, t0: performance.now() };
-  if (CONFIG.holdMs <= 0) { const h = game.hold; game.hold = null; fire(h.blockId, h.localPoint); }   // plain click mode
+  let result = null;                                  // why the press does nothing (null = it starts an action)
+  if (game.status !== 'ready' && !CONFIG.allowClickWhileMoving) result = 'ignored_busy';
+  else if (game.paused) result = 'ignored_paused';
+  else if (game.won) result = 'ignored_after_clear';
+  else if (game.hold) result = 'ignored_hold_active';
+  else if (!hit) result = 'miss';
+  const rec = logger.logAttempt({
+    pointerType: e.pointerType, x: e.clientX, y: e.clientY, world: hit ? view.worldPointOf(hit.block.id, hit.localPoint) : null,
+    blockIndex: hit ? hit.block.id : null, material: hit ? hit.block.props.name : null, result: result ?? 'pending',
+  });
+  if (result) return;
+  game.hold = { blockId: hit.block.id, localPoint: hit.localPoint, t0: performance.now(), rec };
+  if (CONFIG.holdMs <= 0) { const h = game.hold; game.hold = null; fire(h.blockId, h.localPoint, h.rec, 0); }   // plain click mode
 });
-const cancelHold = () => { game.hold = null; };
+const cancelHold = () => { if (game.hold) logger.markReleasedEarly(game.hold.rec, performance.now() - game.hold.t0); game.hold = null; };
 window.addEventListener('pointerup', cancelHold);
 window.addEventListener('pointercancel', cancelHold);
 window.addEventListener('blur', cancelHold);
 document.addEventListener('mouseleave', cancelHold);
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 
-function fire(blockId, localPoint) {
+function fire(blockId, localPoint, rec = null, holdMs = 0) {
   const block = game.sim.blocks[blockId];
   const point = view.worldPointOf(blockId, localPoint);
-  game.sim.applyImpulseAtPoint(block, point, view.pushDirection(), CONFIG.impulseMagnitude);
+  const dir = view.pushDirection();
+  game.sim.applyImpulseAtPoint(block, point, dir, CONFIG.impulseMagnitude);
+  rec ??= logger.logAttempt({ pointerType: 'synthetic', x: null, y: null, world: point, blockIndex: blockId, material: block.props.name, result: 'pending' });   // programmatic fire (tests)
+  logger.markFired(rec, { magnitude: CONFIG.impulseMagnitude, dir }, holdMs);
   game.actions++;
   game.status = 'running'; game.restTime = 0; game.runTime = 0;
 }
@@ -92,7 +122,7 @@ function frame(now) {
   // 500 ms hold elapsed -> exactly one impulse, then the hold is consumed (releasing does nothing more)
   if (game.hold && now - game.hold.t0 >= CONFIG.holdMs) {
     const h = game.hold; game.hold = null;
-    fire(h.blockId, h.localPoint);
+    fire(h.blockId, h.localPoint, h.rec, now - h.t0);
   }
 
   if (!game.paused) {
@@ -120,7 +150,7 @@ function stepOnce() {
     game.restTime = sim.isAtRest() ? game.restTime + CONFIG.fixedDt : 0;
     if (game.restTime >= CONFIG.settle.seconds || game.runTime >= CONFIG.settle.maxWaitSeconds) game.status = 'ready';
   }
-  if (sim.remaining === 0) game.won = true;
+  if (sim.remaining === 0 && !game.won) { game.won = true; logger.endTrial('completed'); }
 }
 
 // ---- HUD --------------------------------------------------------------------------------------
@@ -136,7 +166,7 @@ fillTowerMenu();
 $('mode').addEventListener('change', e => { e.target.blur(); game.set = e.target.value; fillTowerMenu(); loadTower(0, 0); });
 sel.addEventListener('change', () => { sel.blur(); loadTower(+sel.value, 0); });
 $('variant').addEventListener('change', e => { e.target.blur(); loadTower(game.towerIndex, +e.target.value); });
-$('reset').addEventListener('click', e => { e.target.blur(); loadTower(game.towerIndex, game.variantIndex); });
+$('reset').addEventListener('click', e => { e.target.blur(); loadTower(game.towerIndex, game.variantIndex, 'reset'); });
 $('pause').addEventListener('click', e => {
   game.paused = !game.paused; e.target.textContent = game.paused ? 'Resume' : 'Pause'; e.target.blur();
 });
@@ -151,10 +181,13 @@ $('anytime').addEventListener('change', e => { CONFIG.allowClickWhileMoving = e.
 const grayS = $('gray'), stiffS = $('stiff'), BLUE_D = MATERIALS.blue.density;
 grayS.value = MATERIALS.gray.density / BLUE_D; $('grayVal').textContent = (+grayS.value).toFixed(1);
 stiffS.value = SOFT.youngsModulus; $('eVal').textContent = stiffS.value;
-grayS.addEventListener('input', () => { MATERIALS.gray.density = BLUE_D * +grayS.value; $('grayVal').textContent = (+grayS.value).toFixed(1); loadTower(game.towerIndex, game.variantIndex); });
-stiffS.addEventListener('input', () => { SOFT.youngsModulus = +stiffS.value; $('eVal').textContent = stiffS.value; loadTower(game.towerIndex, game.variantIndex); });
+grayS.addEventListener('input', () => { MATERIALS.gray.density = BLUE_D * +grayS.value; $('grayVal').textContent = (+grayS.value).toFixed(1); loadTower(game.towerIndex, game.variantIndex, 'dev_reload'); });
+stiffS.addEventListener('input', () => { SOFT.youngsModulus = +stiffS.value; $('eVal').textContent = stiffS.value; loadTower(game.towerIndex, game.variantIndex, 'dev_reload'); });
 
 // Debug/test hooks (console): window.__game
+$('dlJson').addEventListener('click', e => { logger.download('json'); e.target.blur(); });
+$('dlCsv').addEventListener('click', e => { logger.download('csv'); e.target.blur(); });
+window.__log = logger;
 window.__game = {
   game, view, CONFIG, loadTower, TOWERS, PLAYGROUND, setMode(m) { $('mode').value = m; game.set = m; fillTowerMenu(); loadTower(0, 0); },
   /** client-pixel position of a point on a block (local coords as fractions of its size, e.g. [0,0,0.5] = middle of +z face) */
