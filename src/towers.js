@@ -176,6 +176,14 @@ export const TOWERS = [
   },
 ];
 
+// Inverted copies: exact duplicates of existing towers (same blocks, materials, physics) presented with the camera rolled
+// 180 degrees (see SceneView.setInverted). Appended so they are numbered after the originals. The player-facing name
+// is just the number; `name` below is for developers only.
+for (const src of [3, 7, 12]) {                       // Tower 3 (tall narrow), Tower 7 (mixed materials), Tower 12 (soft vs rigid base)
+  const t = structuredClone(TOWERS[src - 1]);
+  TOWERS.push({ ...t, name: `${t.name} [inverted view of tower ${src}]`, inverted: true });
+}
+
 /** Apply a variant's material swaps and return a plain tower object ready for Simulation. */
 export function resolveTower(tower, variantIndex = 0) {
   const v = tower.variants?.[variantIndex];

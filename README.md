@@ -17,6 +17,15 @@ Towers 1-4 are the original all-blue towers. Developer names for 5-13: 5 heavy b
 11 wrecking weight (heavy cap on a tall blue column, low blue blocks beside it); 12 two small stacks, one on a soft base and one on a rigid base;
 13 heavy block on a soft pillar (deck leans toward it).
 
+Towers 14-16 are exact inverted copies of towers 3, 7 and 12 (developer info only): same blocks, materials and physics, shown with the camera
+rolled 180 degrees about its viewing axis (`SceneView.setInverted`, flag `inverted: true` in `src/towers.js`). Gravity and impulses are unchanged in the
+physics world, so the screen shows the original video rotated by 180 degrees (platform at the top, blocks fall upward). `diagnostics/inverted_vs_original.png` and
+the pixel comparison in the report show the equivalence.
+
+**Demo Mode** (checkbox in the main panel): picks a random tower (never the same one twice in a row); when the tower is cleared the usual success message
+shows for `demoDelayMs` (1.5 s, `src/config.js`) and another random tower loads, indefinitely. Manually selecting a tower, resetting, or switching Demo Mode off
+cancels a pending transition (Demo Mode stays on unless unchecked).
+
 ## Run locally
 Requires Node.js 18+ (https://nodejs.org).
 ```

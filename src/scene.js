@@ -51,6 +51,18 @@ export class SceneView {
   }
   setPlatform(plat) { this._buildPlatform(plat ?? CONFIG.platform); }
 
+  /**
+   * Upside-down presentation: the camera is rolled 180 degrees about its viewing axis. The physics world is untouched
+   * (gravity, impulse, geometry identical); the screen shows exactly the original video rotated by 180 degrees
+   * (platform at the top, blocks "falling" upward). Only ever changed when a tower is loaded.
+   */
+  setInverted(inverted) {
+    this.camera.up.set(0, inverted ? -1 : 1, 0);
+    this.camera.position.set(...CONFIG.camera.position);
+    this.camera.lookAt(...CONFIG.camera.target);
+    this.camera.updateMatrixWorld(true);
+  }
+
   /** Create meshes for every block of a Simulation. */
   buildBlocks(sim) {
     this.clearBlocks();

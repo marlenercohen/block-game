@@ -15,6 +15,7 @@ const game = {
   restTime: 0, runTime: 0,
   hold: null,                 // { blockId, localPoint, t0 } while the button is held and not yet fired
   won: false,
+  demo: false, demoNextAt: null,   // Demo Mode: when set, load another random tower at this time (ms, performance.now)
 };
 
 const DEFAULT_IMPULSE = CONFIG.impulseMagnitude;
@@ -30,6 +31,8 @@ function loadTower(i, v = 0) {
   game.towerIndex = i; game.variantIndex = v;
   game.sim = new Simulation(resolveTower(tw, v));   // fresh world => exact repeatability
   view.setPlatform(tw.platform);
+  view.setInverted(!!tw.inverted);
+  game.demoNextAt = null;                           // any load (manual select, reset, automatic) cancels a pending automatic transition
   if (tw.impulse !== undefined) { CONFIG.impulseMagnitude = tw.impulse; game.impulseOverridden = true; }
   else if (game.impulseOverridden) { CONFIG.impulseMagnitude = DEFAULT_IMPULSE; game.impulseOverridden = false; }
   $('force').value = CONFIG.impulseMagnitude; $('forceVal').textContent = (+CONFIG.impulseMagnitude).toFixed(1);
@@ -70,6 +73,17 @@ function fire(blockId, localPoint) {
   game.status = 'running'; game.restTime = 0; game.runTime = 0;
 }
 
+/** Demo Mode: random tower from the complete list, never the same one twice in a row. */
+function loadRandomTower() {
+  game.set = 'towers'; $('mode').value = 'towers'; fillTowerMenu();
+  let i; do { i = Math.floor(Math.random() * TOWERS.length); } while (TOWERS.length > 1 && i === game.towerIndex);
+  loadTower(i, 0);
+}
+$('demo').addEventListener('change', e => {
+  game.demo = e.target.checked; e.target.blur(); game.demoNextAt = null;
+  if (game.demo) { loadRandomTower(); }
+});
+
 // ---- main loop --------------------------------------------------------------------------------
 let last = performance.now(), acc = 0;
 function frame(now) {
@@ -86,6 +100,11 @@ function frame(now) {
     while (acc >= CONFIG.fixedDt && n < CONFIG.maxStepsPerFrame) { stepOnce(); acc -= CONFIG.fixedDt; n++; }
     if (n === CONFIG.maxStepsPerFrame) acc = 0;
   } else acc = 0;
+
+  if (game.demo && game.won) {                       // Demo Mode: after the existing success feedback, move on
+    if (game.demoNextAt === null) game.demoNextAt = now + CONFIG.demoDelayMs;
+    else if (now >= game.demoNextAt) loadRandomTower();
+  }
 
   view.sync(game.sim);
   view.render();

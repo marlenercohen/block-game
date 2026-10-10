@@ -2,6 +2,7 @@
 export const CONFIG = {
   fixedDt: 1 / 120,          // physics step (s) - fixed for determinism
   maxStepsPerFrame: 12,
+  demoDelayMs: 1500,         // Demo Mode: pause after a cleared tower before the next one loads
   softSubsteps: 8,           // towers containing soft blocks run the solver this many times per fixed step (stiff/viscous springs need it)
   gravity: -9.81,
 
