@@ -17,7 +17,9 @@ export const CONFIG = {
   removeY: -12,
 
   // Ready-for-next-action criteria
-  settle: { linSpeed: 0.06, angSpeed: 0.15, seconds: 0.6, maxWaitSeconds: 12 },
+  settle: { linSpeed: 0.08, angSpeed: 0.2, seconds: 0.3, maxWaitSeconds: 5 },
+  // Developer option: accept clicks while blocks are still moving (off by default: trials start from a still tower)
+  allowClickWhileMoving: false,
 
   platform: {
     size: [4.4, 0.6, 3.2],     // full extents x, y, z; top surface sits at y = 0

@@ -52,7 +52,7 @@ function loadTower(i, v = 0) {
 // ---- input ------------------------------------------------------------------------------------
 const canvas = $('c');
 canvas.addEventListener('pointerdown', e => {
-  if (e.button !== 0 || game.status !== 'ready' || game.paused || game.won || game.hold) return;
+  if (e.button !== 0 || (game.status !== 'ready' && !CONFIG.allowClickWhileMoving) || game.paused || game.won || game.hold) return;
   const hit = view.pick(e.clientX, e.clientY);
   if (!hit) return;
   game.hold = { blockId: hit.block.id, localPoint: hit.localPoint, t0: performance.now() };
@@ -146,6 +146,8 @@ $('hold').value = CONFIG.holdMs; $('holdVal').textContent = CONFIG.holdMs;
 $('hold').addEventListener('input', () => { CONFIG.holdMs = +$('hold').value; $('holdVal').textContent = CONFIG.holdMs; });
 force.addEventListener('input', () => { CONFIG.impulseMagnitude = +force.value; $('forceVal').textContent = (+force.value).toFixed(1); });
 
+$('anytime').checked = CONFIG.allowClickWhileMoving;
+$('anytime').addEventListener('change', e => { CONFIG.allowClickWhileMoving = e.target.checked; e.target.blur(); });
 const grayS = $('gray'), stiffS = $('stiff'), BLUE_D = MATERIALS.blue.density;
 grayS.value = MATERIALS.gray.density / BLUE_D; $('grayVal').textContent = (+grayS.value).toFixed(1);
 stiffS.value = SOFT.youngsModulus; $('eVal').textContent = stiffS.value;

@@ -37,6 +37,7 @@ export class Simulation {
     };
 
     const plat = tower.platform ?? CONFIG.platform;
+    this.plat = plat;
     const [pw, ph, pd] = plat.size;
     const pb = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(plat.center[0], -ph / 2, plat.center[1]));
     this.world.createCollider(
@@ -112,11 +113,17 @@ export class Simulation {
 
   get remaining() { return this.blocks.filter(b => !b.cleared).length; }
 
+  /** A block whose centre is below the platform's top surface and beyond its edge is falling away and can no longer affect the tower. */
+  _isOffPlatform(b) {
+    const t = b.body.translation(), [w, , d] = this.plat.size, [cx, cz] = this.plat.center;
+    return t.y < 0 && (Math.abs(t.x - cx) > w / 2 || Math.abs(t.z - cz) > d / 2);
+  }
+
   /** True when all not-yet-cleared blocks are (nearly) motionless. */
   isAtRest() {
     const { linSpeed, angSpeed } = CONFIG.settle;
     for (const b of this.blocks) {
-      if (b.cleared || b.removed) continue;
+      if (b.cleared || b.removed || this._isOffPlatform(b)) continue;
       for (const x of b.bodies) {
         if (x.isSleeping()) continue;
         const v = x.linvel(), w = x.angvel();
